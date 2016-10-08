@@ -10,6 +10,7 @@ Copyright (c) S. Andrew Ning. All rights reserved.
 
 from __future__ import print_function
 from __future__ import with_statement
+import locale
 import subprocess
 import os
 import sys
@@ -24,6 +25,36 @@ import re
 
 
 exiftool_location = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'Image-ExifTool', 'exiftool')
+
+
+LANGUAGES = {
+    'bg': 'bg_BG',
+    'cs': 'cs_CZ',
+    'da': 'da_DK',
+    'de': 'de_DE',
+    'el': 'el_GR',
+    'en': 'en_US',
+    'es': 'es_ES',
+    'et': 'et_EE',
+    'fi': 'fi_FI',
+    'fr': 'fr_FR',
+    'hr': 'hr_HR',
+    'hu': 'hu_HU',
+    'it': 'it_IT',
+    'lt': 'lt_LT',
+    'lv': 'lv_LV',
+    'nl': 'nl_NL',
+    'no': 'no_NO',
+    'pl': 'pl_PL',
+    'pt': 'pt_PT',
+    'ro': 'ro_RO',
+    'ru': 'ru_RU',
+    'sk': 'sk_SK',
+    'sl': 'sl_SI',
+    'sv': 'sv_SE',
+    'tr': 'tr_TR',
+    'zh': 'zh_CN',
+}
 
 
 # -------- convenience methods -------------
@@ -215,14 +246,15 @@ class ExifTool(object):
 
 # ---------------------------------------
 
-
-
-def sortPhotos(src_dir, dest_dir, sort_format, rename_format, recursive=False,
-        copy_files=False, test=False, remove_duplicates=True, day_begins=0,
-        additional_groups_to_ignore=['File'], additional_tags_to_ignore=[],
-        use_only_groups=None, use_only_tags=None, verbose=True):
+def sortPhotos(src_dir, dest_dir, sort_format, rename_format, lang,
+               recursive=False, copy_files=False, test=False,
+               remove_duplicates=True, day_begins=0,
+               additional_groups_to_ignore=['File'],
+               additional_tags_to_ignore=[], use_only_groups=None,
+               use_only_tags=None, verbose=True):
     """
-    This function is a convenience wrapper around ExifTool based on common usage scenarios for sortphotos.py
+    This function is a convenience wrapper around ExifTool based on common
+    usage scenarios for sortphotos.py
 
     Parameters
     ---------------
@@ -260,6 +292,8 @@ def sortPhotos(src_dir, dest_dir, sort_format, rename_format, recursive=False,
         True if you want to see details of file processing
 
     """
+    lang = '%s.UTF-8' % LANGUAGES[lang]
+    locale.setlocale(locale.LC_ALL, lang)
 
     # some error checking
     if not os.path.exists(src_dir):
@@ -283,12 +317,10 @@ def sortPhotos(src_dir, dest_dir, sort_format, rename_format, recursive=False,
     else:
         args += ['-time:all']
 
-
     if recursive:
         args += ['-r']
 
     args += [src_dir]
-
 
     # get all metadata
     with ExifTool(verbose=verbose) as e:
@@ -307,10 +339,11 @@ def sortPhotos(src_dir, dest_dir, sort_format, rename_format, recursive=False,
     for idx, data in enumerate(metadata):
 
         # extract timestamp date for photo
-        src_file, date, keys = get_oldest_timestamp(data, additional_groups_to_ignore, additional_tags_to_ignore)
+        src_file, date, keys = get_oldest_timestamp(
+            data, additional_groups_to_ignore, additional_tags_to_ignore)
 
         if verbose:
-        # write out which photo we are at
+            # write out which photo we are at
             ending = ']'
             if test:
                 ending = '] (TEST - no files are being moved/copied)'
@@ -326,7 +359,9 @@ def sortPhotos(src_dir, dest_dir, sort_format, rename_format, recursive=False,
         # check if no valid date found
         if not date:
             if verbose:
-                print('No valid dates were found using the specified tags.  File will remain where it is.')
+                print(
+                    'No valid dates were found using the specified tags. '
+                    'File will remain where it is.')
                 print()
                 # sys.stdout.flush()
             continue
@@ -341,9 +376,9 @@ def sortPhotos(src_dir, dest_dir, sort_format, rename_format, recursive=False,
             print('Date/Time: ' + str(date))
             print('Corresponding Tags: ' + ', '.join(keys))
 
-        # early morning photos can be grouped with previous day (depending on user setting)
+        # early morning photos can be grouped with previous day (depending on
+        # user setting)
         date = check_for_early_morning_photos(date, day_begins)
-
 
         # create folder structure
         dir_structure = date.strftime(sort_format)
@@ -362,7 +397,8 @@ def sortPhotos(src_dir, dest_dir, sort_format, rename_format, recursive=False,
             filename = date.strftime(rename_format) + ext
 
         # setup destination file
-        dest_file = os.path.join(dest_file, filename)
+        dest_file = os.path.join(dest_file.decode('utf-8'), filename)
+
         root, ext = os.path.splitext(dest_file)
 
         if verbose:
@@ -474,14 +510,22 @@ def main():
                     default=None,
                     help='specify a restricted set of tags to search for date information\n\
     e.g., EXIF:CreateDate')
+    parser.add_argument(
+        '-l',
+        '--lang',
+        type=str,
+        action='store',
+        default='en',
+        help='use defined lang for months (default to en)'
+    )
 
     # parse command line arguments
     args = parser.parse_args()
 
-    sortPhotos(args.src_dir, args.dest_dir, args.sort, args.rename, args.recursive,
-        args.copy, args.test, not args.keep_duplicates, args.day_begins,
-        args.ignore_groups, args.ignore_tags, args.use_only_groups,
-        args.use_only_tags, not args.silent)
+    sortPhotos(args.src_dir, args.dest_dir, args.sort, args.rename, args.lang,
+               args.recursive, args.copy, args.test, not args.keep_duplicates,
+               args.day_begins, args.ignore_groups, args.ignore_tags,
+               args.use_only_groups, args.use_only_tags, not args.silent)
 
 if __name__ == '__main__':
     main()
